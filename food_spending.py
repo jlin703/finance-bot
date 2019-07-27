@@ -1,7 +1,7 @@
 import googutils
 import argparse
 from datetime import datetime, date, timedelta
-import time
+import json
 
 SPREADSHEET_ID = '1rzlwFJGb0E332vyNzRVB72BGIwmzGPDl9QaCtDYtWyk'
 CURRENT_SHEET = 'Su19 Data'
@@ -55,6 +55,7 @@ class FoodSpending():
         entry_range = '{}{}:{}{}'.format(start_col, row_num, end_col, row_num)
         googutils.write_to_spreadsheet(SPREADSHEET_ID, "'{}'!{}".format(CURRENT_SHEET, entry_range), 
                                         [[name, amount, category]], self.sheet_service)
+        print('Done!')
         if stats_change:
             _, avg0, proj0 = self.stats
             _, avg1, proj1 = self.get_stats()
@@ -78,29 +79,18 @@ def fetch_meal_type():
     return meal_types[i-1]
     
 if __name__ == '__main__':
-    parser = googutils.get_arg_parser(description="Generates grading assignments")
+    parser = argparse.ArgumentParser()
     parser.add_argument('entry_type')
     parser.add_argument('name')
     parser.add_argument('amount', type=float)
     parser.add_argument('-d', '--date', default='TODAY')
-    parser.add_argument('-s', '--shh', action='store_false')
-
+    parser.add_argument('-s', '--stats', action='store_true')
     args = parser.parse_args()
-    fs = FoodSpending()
+
     if args.entry_type.upper() in ('LUNCH', 'DINNER'):
         meal_type = fetch_meal_type()
-        # meal_type = 'Restaurant'
-        times = []
-        for _ in range(1):
-            start = time.time()
-            fs = FoodSpending(get_stats=args.shh)
-            fs.add_meal(args.entry_type.upper(), args.name, args.amount, meal_type, args.date, stats_change=args.shh)
-            end = time.time()
-            times.append(round(end - start, 2))
-        print(times)
-        print(round(sum(times) / 10, 2))
+        fs = FoodSpending(get_stats=args.stats)
+        fs.add_meal(args.entry_type.upper(), args.name, args.amount, meal_type, args.date, stats_change=args.stats)
     elif args.entry_type.upper() == 'SHOPPING':
         fs = FoodSpending()
         fs.add_shopping(args.name, args.amount, args.date)
-    print('Done!')
-

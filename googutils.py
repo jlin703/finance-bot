@@ -1,22 +1,7 @@
-from __future__ import print_function
 from googleapiclient.discovery import build
 from httplib2 import Http
 from oauth2client import file, client, tools
-from googleapiclient.errors import HttpError
 import argparse
-import json
-import numpy as np
-
-def get_arg_parser(description=None):
-    '''Returns an argparser object, that inherits from tools.argparser.
-
-    Use this to get an arg parser that does not conflict with the Oauth2 procedure.'''
-    if description:
-        parser = argparse.ArgumentParser(description, parents=[tools.argparser])
-    else:
-        parser = argparse.ArgumentParser(parents=[tools.argparser])
-    return parser
-
 
 def get_google_service(SCOPES, token_name, api_type='drive', version='v3',
                        creds_file='credentials.json', flags=None):
@@ -52,62 +37,10 @@ def get_google_service(SCOPES, token_name, api_type='drive', version='v3',
     service = build(api_type, version, http=creds.authorize(Http()))
     return service
 
-def load_json_file(filename):
-    '''
-    Takes a JSON file and returns a Python object representation of that JSON object.
-    '''
-    with open(filename, 'r') as f:
-        return json.load(f)
-
-def store_json_file(obj, filename):
-    '''Takes an object and stores it as a JSON file.'''
-    with open(filename, 'w') as f:
-        json.dump(obj, f, indent=4, sort_keys=False)
-
-def id_to_name(id_str, service):
-    '''Retrives the name of the id
-
-    id_str      A string that is the ID of the file in which we wish to get the name of.
-    service     A Google API service object that will let us get the name.
-
-    Returns: the filename of the file on Google Drive with the FileId id_str'''
-    return service.files().get(fileId=id_str, fields="name").execute().get('name', '')
-
-
 def get_column_names_of_sheet(spreadId, sheetName, service):
     '''Retrives a list of columns from the spreadsheet'''
     resp = service.spreadsheets().values().get(spreadsheetId=spreadId, range="'%s'" % sheetName).execute()
     return resp['values'][0]
-
-def pathname_to_id(pathname, service):
-    '''Finds the FileID with a pathname. For example "CS 70 Fall 2018/Spreadsheet".
-
-    NOTE: please make sure that all your folders are uniquely named. Otherwise, this will
-    just pick an arbitrary route to traverse down.
-
-    pathname        A string that uses slashes to denote directory structure.
-    service         A Google API service object that has permissions to read all of Google Drive.
-
-    Returns: A string that is the ID of the file/folder, or None, if this does not exist.
-    '''
-    folders = pathname.split('/')
-    folders = [item for item in folders if item] # Throw out empty strings in case of a/b//c
-
-    parent_id = None
-    for i, folder in enumerate(folders):
-        query = "name='%s' and not trashed" % folder
-        if parent_id:
-            query += " and '%s' in parents" % parent_id
-        resp = service.files().list(q=query, fields="files(id)").execute()
-        files = resp.get("files", [])
-        if not files:
-            return None
-        if len(files) > 1:
-            print("Warning: multiple occurrences of", "/".join(folders[:i+1]))
-            print("Picking the first one found")
-        parent_id = files[0]['id']
-
-    return parent_id
 
 def write_to_spreadsheet(spreadsheetId, cells, values, service, valueInputOption='USER_ENTERED'):
     '''
@@ -138,38 +71,3 @@ def read_from_spreadsheet(spreadsheetId, cells, service, majorDimension='ROWS'):
                                                range=cells, fields='values',
                                                majorDimension=majorDimension).execute()
     return resp['values']
-
-def get_colors_from_spreadsheet(spreadsheetId, cells, service):
-    '''
-    Gets colors from the spreadsheet.
-
-    spreadsheetId       The ID of the spreadsheet you want colors from
-    cells               The cells that you want in A1 notation, e.g. 'Section Sign-up'!G9:X31
-    service             The Google API service object that you got from running get_google_service
-    '''
-    fields = "sheets(data.rowData(values.effectiveFormat.backgroundColor))"
-    resp = service.spreadsheets().get(spreadsheetId=spreadsheetId,
-                                            ranges=cells,
-                                            includeGridData=True,
-                                            fields=fields).execute()
-
-    arr = resp['sheets'][0]['data'][0]['rowData']
-
-    ret = np.zeros((len(arr), len(arr[0]['values']), 3)) # RGB values
-    for i in range(len(arr)):
-        vals = arr[i]['values']
-        for j in range(len(vals)):
-            # Interpret empty format as white cell
-            bg_color = vals[j].get('effectiveFormat', {'backgroundColor': {'red': 1, 'green': 1, 'blue': 1}})
-            ret[i][j][0] = bg_color['backgroundColor'].get('red', 0)
-            ret[i][j][1] = bg_color['backgroundColor'].get('green', 0)
-            ret[i][j][2] = bg_color['backgroundColor'].get('blue', 0)
-
-    return ret
-
-
-def num_to_alpha(num):
-    '''zero indexed'''
-    ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    return ALPHABET[num]
-
