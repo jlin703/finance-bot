@@ -1,0 +1,13 @@
+# Google drive tokens
+tokens/
+
+# Vim files
+*.swp
+
+# credentials
+credentials.json
+
+# CSV outputs
+*.csv
+
+__pycache__
